@@ -100,7 +100,6 @@ public class Verification
                     if (null != m_fmds[0]) {
                         boolean matchFound = false;
                         Map<String, String> tempMap = new HashMap<>();
-                        System.out.println(encodedFingerprints.size());
                         for (var encodedFingerprint : encodedFingerprints) {
                             try {
                                 // Decode stored fingerprint
@@ -115,7 +114,7 @@ public class Verification
 
                                 if (falsematch_rate < target_falsematch_rate) {
                                     String ip = IpApiUtil.getMyIp();
-                                    if(ip == null){
+                                    if (ip == null) {
                                         JOptionPane.showMessageDialog(null, "Failed to send fingerprint print");
                                         break;
                                     }
@@ -126,9 +125,12 @@ public class Verification
                                     m_text.append("Fingerprint matched!\n");
                                     String str = String.format("Dissimilarity score: 0x%x\n", falsematch_rate);
                                     m_text.append(str);
-                                    str = String.format("False match rate: %e\n\n", (double)(falsematch_rate) / Engine.PROBABILITY_ONE);
+                                    str = String.format("False match rate: %e\n\n", (double) (falsematch_rate) / Engine.PROBABILITY_ONE);
                                     m_text.append(str);
                                     myStompClient.sendValidatedFingerprint(tempMap);
+
+                                    // re-fetch the fingerprints of the current user
+                                    fetchFingerprint();
                                     break;
                                 }
                             } catch (UareUException e) {
@@ -147,6 +149,8 @@ public class Verification
                 } catch (UareUException e) {
                     MessageBox.DpError("Error processing fingerprint", e);
                     bCanceled = true;
+                } catch (Exception e) {
+                    JOptionPane.showMessageDialog(null, "Error processing fingerprint");
                 }
             } else if (Reader.CaptureQuality.CANCELED == evt.capture_result.quality) {
                 bCanceled = true;
@@ -186,7 +190,10 @@ public class Verification
         }
     }
 
-    public static void Run(Reader reader) throws ExecutionException, InterruptedException {
+    private static void fetchFingerprint() throws ExecutionException, InterruptedException {
+        if (encodedFingerprints != null)
+            encodedFingerprints.clear();
+
         myStompClient = new MyStompClient(new MessageListener() {
             @Override
             public void onMessageReceive(Map<String, Object> message) throws Exception {
@@ -198,7 +205,10 @@ public class Verification
                 }
             }
         }, "");
+    }
 
+    public static void Run(Reader reader) throws ExecutionException, InterruptedException {
+        fetchFingerprint();
         JDialog dlg = new JDialog((JDialog) null, "Verification", true);
         Verification verification = new Verification(reader);
         verification.doModal(dlg);
