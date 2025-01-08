@@ -1,11 +1,18 @@
 package org.Fingerprint.web_socket;
 
-import com.digitalpersona.uareu.Fid;
-import com.digitalpersona.uareu.dpfpdd.FidImpl;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import javax.swing.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
@@ -50,14 +57,71 @@ public class FingerprintUtil {
         return encodedFingerprints;
     }
 
-    public static byte[] decodeFingerprint(String encodedFingerprint) {
-        return Base64.getDecoder().decode(encodedFingerprint);
+    public static List<String> getAllStoredFingerprints(){
+        String urlString = "http://localhost:8080/api/v1/auth/fingerprints";
+        String jsonPayload = "{\"code\":\"3C1224C7DC1569381DE63C223113D9A524A1DE63C223113D9A524AF8E2A3113D9A524A1DE63C223113D9A524AF8E2A63C1224C7DC1569381DE63F8E2A63C1224C7DC1569381DE63C63C1224C7DC1569381DE63F8E2A63C1224C7DC1569381DE63CDE1D7C5F65177BF5\"}";
+        StringBuilder response = new StringBuilder();
+
+        try {
+            URL url = new URL(urlString);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setDoOutput(true);
+
+            // Send the JSON payload
+            try (OutputStream os = connection.getOutputStream()) {
+                byte[] input = jsonPayload.getBytes("utf-8");
+                os.write(input, 0, input.length);
+            }
+
+            // Read the response
+            int status = connection.getResponseCode();
+            if (status == 200) {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), "utf-8"));
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    response.append(line.trim());
+                }
+                reader.close();
+            } else {
+                response.append("Error: ").append(status);
+            }
+
+            connection.disconnect();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+
+        String jsonResponse = response.toString();
+
+        try {
+            // Parse the JSON string
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode rootNode = objectMapper.readTree(jsonResponse);
+
+            // Navigate to the "fingerprints" array
+            JsonNode fingerprintsNode = rootNode.path("data").path("fingerprints");
+
+            // Extract the fingerprints into a list
+            List<String> fingerprints = new ArrayList<>();
+            if (fingerprintsNode.isArray()) {
+                for (JsonNode fingerprint : fingerprintsNode) {
+                    fingerprints.add(fingerprint.asText());
+                }
+            }
+
+            return fingerprints;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
-    public static Fid decodeFingerprintToFid(String encodedFingerprint) {
-        // Step 1: Decode the Base64 encoded fingerprint string
-        byte[] fingerprintData = Base64.getDecoder().decode(encodedFingerprint);
-        // Step 2: Initialize FidImpl (assuming the format is ANSI_381_2004 and a single view for simplicity)
-        return new FidImpl(Fid.Format.ANSI_381_2004, 1);
+    public static String getWebSocketCode(){
+        return "3C1224C7DC1569381DE63C223113D9A524A1DE63C223113D9A524AF8E2A3113D9A524A1DE63C223113D9A524AF8E2A63C1224C7DC1569381DE63F8E2A63C1224C7DC1569381DE63C63C1224C7DC1569381DE63F8E2A63C1224C7DC1569381DE63CDE1D7C5F65177BF5";
     }
+
+
 }

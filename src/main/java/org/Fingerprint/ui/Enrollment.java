@@ -2,10 +2,7 @@ package org.Fingerprint.ui;
 
 import com.digitalpersona.uareu.*;
 import lombok.extern.slf4j.Slf4j;
-import org.Fingerprint.web_socket.IpApiUtil;
-import org.Fingerprint.web_socket.MessageListener;
-import org.Fingerprint.web_socket.MyStompClient;
-import org.Fingerprint.web_socket.UserUtil;
+import org.Fingerprint.web_socket.*;
 
 import javax.swing.*;
 import java.awt.*;
@@ -14,9 +11,8 @@ import java.awt.event.ActionListener;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URISyntaxException;
 import java.time.LocalDate;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 @Slf4j
@@ -173,6 +169,8 @@ public class Enrollment
     private JTextArea m_text;
     private boolean m_bJustStarted;
 
+    private static List<String> registeredFingerprints;
+
     private Enrollment(Reader reader) {
         m_reader = reader;
         m_bJustStarted = true;
@@ -204,6 +202,8 @@ public class Enrollment
     }
 
     public void actionPerformed(ActionEvent e) {
+        Engine engine = UareUGlobal.GetEngine();
+
         if (e.getActionCommand().equals(ACT_BACK)) {
             //destroy dialog to cancel enrollment
             m_dlgParent.setVisible(false);
@@ -239,18 +239,40 @@ public class Enrollment
                     String str = String.format("    enrollment template created, size: %d\n\n\n", evt.enrollment_fmd.getData().length);
                     m_text.append(str);
                     try {
-                        byte[] data = evt.enrollment_fmd.getData();
-                        Map<String, String> d = new HashMap<>();
-                        d.put("data", Base64.getEncoder().encodeToString(data));
-                        d.put("date", String.valueOf(LocalDate.now()));
-
+                        fetchFingerprint();
                         String username = JOptionPane.showInputDialog(null, "Enter Username");
                         if (username == null || username.isEmpty())
                             throw new Exception("");
 
-                        UserUtil.username = username;
-                        d.put("username", username);
-                        myStompClient.sendMessage(d);
+                        boolean isFingerprintExisting = false;
+
+                        // perform checking if the fingerprint that just registered matches to the stored fingerprints
+                        for(var registeredFingerprint : registeredFingerprints){
+                            byte[] fingerprintBytes = Base64.getDecoder().decode(registeredFingerprint);
+                            // Create FMD directly from stored data
+                            Fmd storedFmd = UareUGlobal.GetImporter().ImportFmd(fingerprintBytes, Fmd.Format.ANSI_378_2004, Fmd.Format.ANSI_378_2004);
+
+                            // Compare fingerprints
+                            int falsematch_rate = engine.Compare(evt.enrollment_fmd, 0, storedFmd, 0);
+                            int target_falsematch_rate = Engine.PROBABILITY_ONE / 100000;
+
+                            if (falsematch_rate < target_falsematch_rate) {
+                                isFingerprintExisting = true;
+                                break;
+                            }
+                        }
+
+                        if(!isFingerprintExisting){
+                            byte[] data = evt.enrollment_fmd.getData();
+                            Map<String, String> d = new HashMap<>();
+                            d.put("data", Base64.getEncoder().encodeToString(data));
+                            d.put("date", String.valueOf(LocalDate.now()));
+                            UserUtil.username = username;
+                            d.put("username", username);
+                            myStompClient.sendEnrollmentMessage(d);
+                        }else{
+                            JOptionPane.showMessageDialog(null, "This Fingerprint is Existing");
+                        }
                     } catch (Exception ex) {
                         JOptionPane.showMessageDialog(null, "Something went wrong");
                     }
@@ -302,14 +324,21 @@ public class Enrollment
         }
     }
 
+    private static void fetchFingerprint() {
+        List<String> fingerprints = FingerprintUtil.getAllStoredFingerprints();
+        if (fingerprints != null){
+            registeredFingerprints.clear();
+            registeredFingerprints.addAll(fingerprints);
+        }
+    }
+
     public static void Run(Reader reader) throws URISyntaxException, InterruptedException, ExecutionException {
+        registeredFingerprints = new ArrayList<>();
         myStompClient = new MyStompClient(new MessageListener() {
             @Override
-            public void onMessageReceive(Map<String, Object> message) {
-
+            public void onMessageReceive(Map<String, Object> message) throws Exception {
             }
         }, "");
-
         JDialog dlg = new JDialog((JDialog) null, "Enrollment", true);
         Enrollment enrollment = new Enrollment(reader);
         enrollment.doModal(dlg);

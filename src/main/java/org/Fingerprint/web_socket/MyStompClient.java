@@ -34,7 +34,7 @@ public class MyStompClient {
         session = stompClient.connectAsync(url, sessionHandler).get();
     }
 
-    public void sendMessage(Map<String, String> data) {
+    public void sendEnrollmentMessage(Map<String, String> data) {
         try {
             session.send("/app/enroll.fingerprint", data);
         } catch (Exception e) {

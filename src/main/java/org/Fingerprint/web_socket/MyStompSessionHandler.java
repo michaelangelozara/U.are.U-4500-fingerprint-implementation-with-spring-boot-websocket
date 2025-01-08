@@ -58,7 +58,7 @@ public class MyStompSessionHandler extends StompSessionHandlerAdapter {
                         String errorMessage = (String) data.get("message");
                         JOptionPane.showMessageDialog(null, errorMessage, "Something went wrong", JOptionPane.ERROR_MESSAGE);
                     } else {
-                        JOptionPane.showMessageDialog(null,"Something went wrong", "Error", JOptionPane.ERROR_MESSAGE);
+                        JOptionPane.showMessageDialog(null, "Something went wrong", "Error", JOptionPane.ERROR_MESSAGE);
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -79,9 +79,9 @@ public class MyStompSessionHandler extends StompSessionHandlerAdapter {
                     if (payload instanceof Map) {
                         Map data = (Map) payload;
                         String successMessage = (String) data.get("message");
-                        JOptionPane.showMessageDialog(null, successMessage, "Something went wrong", JOptionPane.INFORMATION_MESSAGE);
+                        JOptionPane.showMessageDialog(null, successMessage, "Fingerprint is Successfully Registered", JOptionPane.INFORMATION_MESSAGE);
                     } else {
-                        JOptionPane.showMessageDialog(null,"Something went wrong", "Error", JOptionPane.ERROR_MESSAGE);
+                        JOptionPane.showMessageDialog(null, "Something went wrong", "Error", JOptionPane.ERROR_MESSAGE);
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
